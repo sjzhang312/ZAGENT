@@ -1,0 +1,11 @@
+target/
+node_modules/
+dist/
+data/
+ai-workspace/
+logs/
+*.log
+.idea/
+*.iml
+.vscode/
+backend/lib/
