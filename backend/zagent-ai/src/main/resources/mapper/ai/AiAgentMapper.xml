@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zagent.ai.mapper.AiAgentMapper">
+
+    <resultMap type="AiAgent" id="AiAgentResult">
+        <result property="agentId" column="agent_id" />
+        <result property="agentName" column="agent_name" />
+        <result property="description" column="description" />
+        <result property="modelId" column="model_id" />
+        <result property="thinkingLevel" column="thinking_level" />
+        <result property="temperature" column="temperature" />
+        <result property="maxTokens" column="max_tokens" />
+        <result property="enabledTools" column="enabled_tools" />
+        <result property="systemPrompt" column="system_prompt" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="selectAiAgentVo">
+        select
+            agent_id,
+            agent_name,
+            description,
+            model_id,
+            thinking_level,
+            temperature,
+            max_tokens,
+            enabled_tools,
+            system_prompt,
+            status,
+            create_by,
+            create_time,
+            update_by,
+            update_time,
+            remark
+            from ai_agent
+    </sql>
+
+    <select id="selectAiAgentList" parameterType="AiAgent" resultMap="AiAgentResult">
+        <include refid="selectAiAgentVo"/>
+        <where>
+            <if test="agentName != null and agentName != ''"> and agent_name = #{agentName}</if>
+            <if test="modelId != null "> and model_id = #{modelId}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by agent_id desc
+    </select>
+
+    <select id="selectAiAgentById" parameterType="Long" resultMap="AiAgentResult">
+        <include refid="selectAiAgentVo"/>
+        where agent_id = #{agentId}
+    </select>
+
+    <insert id="insertAiAgent" parameterType="AiAgent" useGeneratedKeys="true" keyProperty="agentId">
+        insert into ai_agent
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">agent_name,</if>
+            <if test="description != null and description != ''">description,</if>
+            <if test="modelId != null ">model_id,</if>
+            <if test="thinkingLevel != null ">thinking_level,</if>
+            <if test="temperature != null ">temperature,</if>
+            <if test="maxTokens != null ">max_tokens,</if>
+            <if test="enabledTools != null and enabledTools != ''">enabled_tools,</if>
+            <if test="systemPrompt != null and systemPrompt != ''">system_prompt,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null ">create_by,</if>
+            <if test="createTime != null ">create_time,</if>
+            <if test="updateBy != null ">update_by,</if>
+            <if test="updateTime != null ">update_time,</if>
+            <if test="remark != null ">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">#{agentName},</if>
+            <if test="description != null and description != ''">#{description},</if>
+            <if test="modelId != null ">#{modelId},</if>
+            <if test="thinkingLevel != null ">#{thinkingLevel},</if>
+            <if test="temperature != null ">#{temperature},</if>
+            <if test="maxTokens != null ">#{maxTokens},</if>
+            <if test="enabledTools != null and enabledTools != ''">#{enabledTools},</if>
+            <if test="systemPrompt != null and systemPrompt != ''">#{systemPrompt},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null ">#{createBy},</if>
+            <if test="createTime != null ">#{createTime},</if>
+            <if test="updateBy != null ">#{updateBy},</if>
+            <if test="updateTime != null ">#{updateTime},</if>
+            <if test="remark != null ">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateAiAgent" parameterType="AiAgent">
+        update ai_agent
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="agentName != null and agentName != ''">agent_name = #{agentName},</if>
+            <if test="description != null and description != ''">description = #{description},</if>
+            <if test="modelId != null ">model_id = #{modelId},</if>
+            <if test="thinkingLevel != null ">thinking_level = #{thinkingLevel},</if>
+            <if test="temperature != null ">temperature = #{temperature},</if>
+            <if test="maxTokens != null ">max_tokens = #{maxTokens},</if>
+            <if test="enabledTools != null and enabledTools != ''">enabled_tools = #{enabledTools},</if>
+            <if test="systemPrompt != null and systemPrompt != ''">system_prompt = #{systemPrompt},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="createBy != null ">create_by = #{createBy},</if>
+            <if test="createTime != null ">create_time = #{createTime},</if>
+            <if test="updateBy != null ">update_by = #{updateBy},</if>
+            <if test="updateTime != null ">update_time = #{updateTime},</if>
+            <if test="remark != null ">remark = #{remark},</if>
+        </trim>
+        where agent_id = #{agentId}
+    </update>
+
+    <delete id="deleteAiAgentByIds" parameterType="Long">
+        delete from ai_agent where agent_id in
+        <foreach collection="array" item="agentId" open="(" separator="," close=")">
+            #{agentId}
+        </foreach>
+    </delete>
+
+</mapper>

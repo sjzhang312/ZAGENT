@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zagent.ai.mapper.AiSkillMapper">
+
+    <resultMap type="AiSkill" id="AiSkillResult">
+        <result property="skillId" column="skill_id" />
+        <result property="skillName" column="skill_name" />
+        <result property="description" column="description" />
+        <result property="content" column="content" />
+        <result property="enabled" column="enabled" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="selectAiSkillVo">
+        select
+            skill_id,
+            skill_name,
+            description,
+            content,
+            enabled,
+            create_by,
+            create_time,
+            update_by,
+            update_time,
+            remark
+            from ai_skill
+    </sql>
+
+    <select id="selectAiSkillList" parameterType="AiSkill" resultMap="AiSkillResult">
+        <include refid="selectAiSkillVo"/>
+        <where>
+            <if test="skillName != null and skillName != ''"> and skill_name = #{skillName}</if>
+            <if test="enabled != null and enabled != ''"> and enabled = #{enabled}</if>
+        </where>
+        order by skill_id desc
+    </select>
+
+    <select id="selectAiSkillById" parameterType="Long" resultMap="AiSkillResult">
+        <include refid="selectAiSkillVo"/>
+        where skill_id = #{skillId}
+    </select>
+
+    <insert id="insertAiSkill" parameterType="AiSkill" useGeneratedKeys="true" keyProperty="skillId">
+        insert into ai_skill
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="skillName != null and skillName != ''">skill_name,</if>
+            <if test="description != null and description != ''">description,</if>
+            <if test="content != null and content != ''">content,</if>
+            <if test="enabled != null and enabled != ''">enabled,</if>
+            <if test="createBy != null ">create_by,</if>
+            <if test="createTime != null ">create_time,</if>
+            <if test="updateBy != null ">update_by,</if>
+            <if test="updateTime != null ">update_time,</if>
+            <if test="remark != null ">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="skillName != null and skillName != ''">#{skillName},</if>
+            <if test="description != null and description != ''">#{description},</if>
+            <if test="content != null and content != ''">#{content},</if>
+            <if test="enabled != null and enabled != ''">#{enabled},</if>
+            <if test="createBy != null ">#{createBy},</if>
+            <if test="createTime != null ">#{createTime},</if>
+            <if test="updateBy != null ">#{updateBy},</if>
+            <if test="updateTime != null ">#{updateTime},</if>
+            <if test="remark != null ">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateAiSkill" parameterType="AiSkill">
+        update ai_skill
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="skillName != null and skillName != ''">skill_name = #{skillName},</if>
+            <if test="description != null and description != ''">description = #{description},</if>
+            <if test="content != null and content != ''">content = #{content},</if>
+            <if test="enabled != null and enabled != ''">enabled = #{enabled},</if>
+            <if test="createBy != null ">create_by = #{createBy},</if>
+            <if test="createTime != null ">create_time = #{createTime},</if>
+            <if test="updateBy != null ">update_by = #{updateBy},</if>
+            <if test="updateTime != null ">update_time = #{updateTime},</if>
+            <if test="remark != null ">remark = #{remark},</if>
+        </trim>
+        where skill_id = #{skillId}
+    </update>
+
+    <delete id="deleteAiSkillByIds" parameterType="Long">
+        delete from ai_skill where skill_id in
+        <foreach collection="array" item="skillId" open="(" separator="," close=")">
+            #{skillId}
+        </foreach>
+    </delete>
+
+</mapper>

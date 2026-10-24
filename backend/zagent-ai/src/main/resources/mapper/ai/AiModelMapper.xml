@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zagent.ai.mapper.AiModelMapper">
+
+    <resultMap type="AiModel" id="AiModelResult">
+        <result property="modelId" column="model_id" />
+        <result property="providerId" column="provider_id" />
+        <result property="modelCode" column="model_code" />
+        <result property="displayName" column="display_name" />
+        <result property="supportReasoning" column="support_reasoning" />
+        <result property="status" column="status" />
+        <result property="createBy" column="create_by" />
+        <result property="createTime" column="create_time" />
+        <result property="updateBy" column="update_by" />
+        <result property="updateTime" column="update_time" />
+        <result property="remark" column="remark" />
+    </resultMap>
+
+    <sql id="selectAiModelVo">
+        select
+            model_id,
+            provider_id,
+            model_code,
+            display_name,
+            support_reasoning,
+            status,
+            create_by,
+            create_time,
+            update_by,
+            update_time,
+            remark
+            from ai_model
+    </sql>
+
+    <select id="selectAiModelList" parameterType="AiModel" resultMap="AiModelResult">
+        <include refid="selectAiModelVo"/>
+        <where>
+            <if test="providerId != null "> and provider_id = #{providerId}</if>
+            <if test="modelCode != null and modelCode != ''"> and model_code = #{modelCode}</if>
+            <if test="displayName != null and displayName != ''"> and display_name = #{displayName}</if>
+            <if test="status != null and status != ''"> and status = #{status}</if>
+        </where>
+        order by model_id desc
+    </select>
+
+    <select id="selectAiModelById" parameterType="Long" resultMap="AiModelResult">
+        <include refid="selectAiModelVo"/>
+        where model_id = #{modelId}
+    </select>
+
+    <insert id="insertAiModel" parameterType="AiModel" useGeneratedKeys="true" keyProperty="modelId">
+        insert into ai_model
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="providerId != null ">provider_id,</if>
+            <if test="modelCode != null and modelCode != ''">model_code,</if>
+            <if test="displayName != null and displayName != ''">display_name,</if>
+            <if test="supportReasoning != null and supportReasoning != ''">support_reasoning,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="createBy != null ">create_by,</if>
+            <if test="createTime != null ">create_time,</if>
+            <if test="updateBy != null ">update_by,</if>
+            <if test="updateTime != null ">update_time,</if>
+            <if test="remark != null ">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="providerId != null ">#{providerId},</if>
+            <if test="modelCode != null and modelCode != ''">#{modelCode},</if>
+            <if test="displayName != null and displayName != ''">#{displayName},</if>
+            <if test="supportReasoning != null and supportReasoning != ''">#{supportReasoning},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="createBy != null ">#{createBy},</if>
+            <if test="createTime != null ">#{createTime},</if>
+            <if test="updateBy != null ">#{updateBy},</if>
+            <if test="updateTime != null ">#{updateTime},</if>
+            <if test="remark != null ">#{remark},</if>
+        </trim>
+    </insert>
+
+    <update id="updateAiModel" parameterType="AiModel">
+        update ai_model
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="providerId != null ">provider_id = #{providerId},</if>
+            <if test="modelCode != null and modelCode != ''">model_code = #{modelCode},</if>
+            <if test="displayName != null and displayName != ''">display_name = #{displayName},</if>
+            <if test="supportReasoning != null and supportReasoning != ''">support_reasoning = #{supportReasoning},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="createBy != null ">create_by = #{createBy},</if>
+            <if test="createTime != null ">create_time = #{createTime},</if>
+            <if test="updateBy != null ">update_by = #{updateBy},</if>
+            <if test="updateTime != null ">update_time = #{updateTime},</if>
+            <if test="remark != null ">remark = #{remark},</if>
+        </trim>
+        where model_id = #{modelId}
+    </update>
+
+    <delete id="deleteAiModelByIds" parameterType="Long">
+        delete from ai_model where model_id in
+        <foreach collection="array" item="modelId" open="(" separator="," close=")">
+            #{modelId}
+        </foreach>
+    </delete>
+
+</mapper>

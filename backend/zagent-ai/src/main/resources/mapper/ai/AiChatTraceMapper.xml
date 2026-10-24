@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zagent.ai.mapper.AiChatTraceMapper">
+
+    <resultMap type="AiChatTrace" id="AiChatTraceResult">
+        <result property="traceId"     column="trace_id"     />
+        <result property="messageId"   column="message_id"   />
+        <result property="seq"         column="seq"          />
+        <result property="toolName"    column="tool_name"    />
+        <result property="args"        column="args"         />
+        <result property="result"      column="result"       />
+        <result property="status"      column="status"       />
+        <result property="durationMs"  column="duration_ms"  />
+        <result property="createTime"  column="create_time"  />
+    </resultMap>
+
+    <select id="selectAiChatTraceList" parameterType="AiChatTrace" resultMap="AiChatTraceResult">
+        select trace_id, message_id, seq, tool_name, args, result, status, duration_ms, create_time from ai_chat_trace
+        <where>
+            <if test="messageId != null"> and message_id = #{messageId}</if>
+        </where>
+        order by trace_id asc
+    </select>
+
+    <insert id="insertAiChatTrace" parameterType="AiChatTrace" useGeneratedKeys="true" keyProperty="traceId">
+        insert into ai_chat_trace(message_id, seq, tool_name, args, result, status, duration_ms, create_time)
+        values (#{messageId}, #{seq}, #{toolName}, #{args}, #{result}, #{status}, #{durationMs}, CURRENT_TIMESTAMP)
+    </insert>
+
+</mapper>

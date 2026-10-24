@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zagent.ai.mapper.AiChatSessionMapper">
+
+    <resultMap type="AiChatSession" id="AiChatSessionResult">
+        <result property="sessionId"    column="session_id"    />
+        <result property="sessionName"  column="session_name"  />
+        <result property="agentId"      column="agent_id"      />
+        <result property="userId"       column="user_id"       />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+    </resultMap>
+
+    <sql id="selectVo">
+        select session_id, session_name, agent_id, user_id, create_by, create_time, update_by, update_time, remark from ai_chat_session
+    </sql>
+
+    <select id="selectAiChatSessionList" parameterType="AiChatSession" resultMap="AiChatSessionResult">
+        <include refid="selectVo"/>
+        <where>
+            <if test="userId != null"> and user_id = #{userId}</if>
+            <if test="sessionName != null and sessionName != ''"> and session_name like concat('%', #{sessionName}, '%')</if>
+            <if test="agentId != null"> and agent_id = #{agentId}</if>
+        </where>
+        order by session_id desc
+    </select>
+
+    <select id="selectAiChatSessionById" parameterType="Long" resultMap="AiChatSessionResult">
+        <include refid="selectVo"/>
+        where session_id = #{sessionId}
+    </select>
+
+    <insert id="insertAiChatSession" parameterType="AiChatSession" useGeneratedKeys="true" keyProperty="sessionId">
+        insert into ai_chat_session
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="sessionName != null and sessionName != ''">session_name,</if>
+            <if test="agentId != null">agent_id,</if>
+            <if test="userId != null">user_id,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="sessionName != null and sessionName != ''">#{sessionName},</if>
+            <if test="agentId != null">#{agentId},</if>
+            <if test="userId != null">#{userId},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            CURRENT_TIMESTAMP
+        </trim>
+    </insert>
+
+    <update id="updateAiChatSession" parameterType="AiChatSession">
+        update ai_chat_session
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="sessionName != null and sessionName != ''">session_name = #{sessionName},</if>
+            <if test="agentId != null">agent_id = #{agentId},</if>
+            update_time = CURRENT_TIMESTAMP
+        </trim>
+        where session_id = #{sessionId}
+    </update>
+
+    <delete id="deleteAiChatSessionByIds" parameterType="Long">
+        delete from ai_chat_session where session_id in
+        <foreach collection="array" item="sessionId" open="(" separator="," close=")">
+            #{sessionId}
+        </foreach>
+    </delete>
+
+</mapper>
