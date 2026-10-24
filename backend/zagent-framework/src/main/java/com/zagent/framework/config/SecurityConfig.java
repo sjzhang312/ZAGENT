@@ -97,7 +97,9 @@ public class SecurityConfig
             // 基于token，所以不需要session
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             // 注解标记允许匿名访问的url
+            // SseEmitter 异步分发（AI 流式问答）不带安全上下文，需放行
             .authorizeHttpRequests((requests) -> {
+                requests.dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll();
                 permitAllUrl.getUrls().forEach(url -> requests.requestMatchers(url).permitAll());
                 // 对于登录login 注册register 验证码captchaImage 允许匿名访问
                 requests.requestMatchers("/login", "/register", "/captchaImage").permitAll()
