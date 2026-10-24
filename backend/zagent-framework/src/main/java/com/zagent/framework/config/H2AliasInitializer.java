@@ -78,6 +78,8 @@ public class H2AliasInitializer
     @PostConstruct
     public void init()
     {
+        // 先经 Druid 池探测数据源类型（连接失败时给出友好提示）
+        String h2Url;
         try (Connection conn = dataSource.getConnection())
         {
             DatabaseMetaData meta = conn.getMetaData();
@@ -86,12 +88,7 @@ public class H2AliasInitializer
                 log.info("非 H2 数据源（{}），跳过兼容别名注册", meta.getURL());
                 return;
             }
-            try (Statement st = conn.createStatement())
-            {
-                st.execute(ALIAS_FIND_IN_SET);
-                st.execute(ALIAS_DATE_FORMAT);
-            }
-            log.info("H2 兼容别名注册完成：FIND_IN_SET / DATE_FORMAT");
+            h2Url = meta.getURL();
         }
         catch (Exception e)
         {
@@ -99,6 +96,18 @@ public class H2AliasInitializer
                 "初始化 H2 失败：无法连接 H2 数据库。请先运行项目根目录的 启动H2数据库.bat（jdbc:h2:tcp://localhost:9101）。"
                     + e.getMessage(), e);
         }
+        // DriverManager 直连注册别名（绕过 Druid 过滤链，避免 stat 插件解析 H2 DDL 产生的报错噪音）
+        try (Connection conn = java.sql.DriverManager.getConnection(h2Url, "sa", "");
+             Statement st = conn.createStatement())
+        {
+            st.execute(ALIAS_FIND_IN_SET);
+            st.execute(ALIAS_DATE_FORMAT);
+        }
+        catch (Exception e)
+        {
+            throw new IllegalStateException("注册 H2 兼容别名失败: " + e.getMessage(), e);
+        }
+        log.info("H2 兼容别名注册完成：FIND_IN_SET / DATE_FORMAT");
     }
 
     /**
