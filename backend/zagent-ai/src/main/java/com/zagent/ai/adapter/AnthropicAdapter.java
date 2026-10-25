@@ -2,6 +2,7 @@ package com.zagent.ai.adapter;
 
 import java.time.Duration;
 import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClientAsync;
 import org.springframework.ai.anthropic.AnthropicChatModel;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.model.ChatModel;
@@ -34,13 +35,23 @@ public class AnthropicAdapter extends AbstractProviderAdapter
     @Override
     protected ChatModel buildChatModel(ChatRequest request, String cacheKey)
     {
-        com.anthropic.client.AnthropicClient client = AnthropicOkHttpClient.builder()
+        String base = normalizeBase(request.getBaseUrl());
+        // Spring AI 2.0 流式走 async 客户端、非流式走 sync 客户端，
+        // 仅设置 anthropicClient 时 stream() 会在内部重建无凭证的 async 客户端，
+        // 两个客户端都要显式构建传入
+        com.anthropic.client.AnthropicClient sync = AnthropicOkHttpClient.builder()
                 .apiKey(request.getApiKey())
-                .baseUrl(normalizeBase(request.getBaseUrl()))
+                .baseUrl(base)
+                .timeout(Duration.ofSeconds(120))
+                .build();
+        com.anthropic.client.AnthropicClientAsync async = AnthropicOkHttpClientAsync.builder()
+                .apiKey(request.getApiKey())
+                .baseUrl(base)
                 .timeout(Duration.ofSeconds(120))
                 .build();
         return AnthropicChatModel.builder()
-                .anthropicClient(client)
+                .anthropicClient(sync)
+                .anthropicClientAsync(async)
                 .build();
     }
 
@@ -75,7 +86,7 @@ public class AnthropicAdapter extends AbstractProviderAdapter
     }
 
     @Override
-    protected String extractThinking(ChatResponse chunk)
+    protected String extractThinking(ChatResponse chunk, java.util.concurrent.atomic.AtomicReference<String> state)
     {
         if (chunk.getResults() == null || chunk.getResults().isEmpty())
         {

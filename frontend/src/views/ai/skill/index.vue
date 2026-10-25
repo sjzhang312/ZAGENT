@@ -33,7 +33,10 @@
         </el-table-column>
         <el-table-column label="描述" prop="description" min-width="200" show-overflow-tooltip />
         <el-table-column label="内容" min-width="200" show-overflow-tooltip>
-          <template #default="scope">{{ (scope.row.content || '').slice(0, 80) }}</template>
+          <template #default="scope">
+            <span v-if="scope.row.content">{{ scope.row.content.slice(0, 80) }}</span>
+            <span v-else class="pkg-tip">技能包 · 附属资源见详情</span>
+          </template>
         </el-table-column>
         <el-table-column label="启用" width="90" align="center">
           <template #default="scope">
@@ -67,6 +70,17 @@
         <el-form-item label="启用">
           <el-switch v-model="form.enabled" active-value="1" inactive-value="0" />
           <span class="form-tip">启用后才能被智能体勾选与 / 调用</span>
+        </el-form-item>
+        <el-form-item v-if="form.resources && form.resources.length" label="附属资源">
+          <div class="resource-box">
+            <div class="resource-head">技能包文件（沙箱 skills/{{ form.skillName }}/，聊天中模型可用 read / bash 等工具直接访问执行）</div>
+            <el-table :data="form.resources" size="small" max-height="260">
+              <el-table-column label="文件" prop="relPath" min-width="260" show-overflow-tooltip />
+              <el-table-column label="大小" width="110" align="right">
+                <template #default="scope">{{ formatSize(scope.row.fileSize) }}</template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -175,17 +189,36 @@ function handleImport(e: Event) {
   if (!file) return
   importSkill(file).then((res) => {
     const rows: SkillImportRow[] = res.data || []
-    proxy.$modal.msgSuccess('导入完成：' + rows.map((r) => r.action + ' /' + r.name).join('、'))
+    proxy.$modal.msgSuccess('导入完成：' + rows.map((r) => r.action + ' /' + r.name + (r.resourceCount ? `（${r.resourceCount} 个附属资源）` : '')).join('、'))
     getList()
   }).finally(() => {
     input.value = ''
   })
 }
 
+function formatSize(size?: number): string {
+  if (size == null) return '-'
+  if (size < 1024) return size + ' B'
+  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB'
+  return (size / 1024 / 1024).toFixed(2) + ' MB'
+}
+
 getList()
 </script>
 
 <style scoped>
+.pkg-tip {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.resource-box {
+  width: 100%;
+}
+.resource-head {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
 .form-tip {
   margin-left: 10px;
   font-size: 12px;

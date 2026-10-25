@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import logo from '@/assets/logo/logo.png'
+import logo from '@/assets/logo/logo.svg'
 import useSettingsStore from '@/store/modules/settings'
 import variables from '@/assets/styles/variables.module.scss'
 

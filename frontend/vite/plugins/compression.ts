@@ -7,7 +7,7 @@ export default function createCompression(env: Record<string, string>) {
   if (VITE_BUILD_COMPRESS) {
     const compressList = VITE_BUILD_COMPRESS.split(',')
     if (compressList.includes('gzip')) {
-      // http://doc.ruoyi.vip/ruoyi-vue/other/faq.html#使用gzip解压缩静态文件
+      // vite-plugin-compression 官方插件，输出 .gz 静态压缩文件
       plugin.push(
         compression({
           ext: '.gz',

@@ -10,14 +10,22 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.zagent.ai.domain.AiSkill;
+import com.zagent.ai.domain.AiSkillResource;
 import com.zagent.ai.mapper.AiSkillMapper;
+import com.zagent.ai.mapper.AiSkillResourceMapper;
 import com.zagent.ai.service.IAiSkillService;
+import com.zagent.ai.tools.SkillStorageService;
 import com.zagent.common.exception.ServiceException;
+import com.zagent.common.utils.StringUtils;
 
 /**
- * 技能Service业务层处理：含 zip 导入（SKILL.md frontmatter 解析、防 zip-slip、按名 upsert）
+ * 技能Service业务层处理。
+ * 现代技能包（SKILL.md + references/scripts/data 附属资源）导入：
+ * 全量解压落盘到沙箱 skills/{技能名}/（正文不存库），资源清单入 ai_skill_resource；
+ * 散装单 md 兼容导入（content 存库）。
  *
  * @author zagent
  */
@@ -30,10 +38,41 @@ public class AiSkillServiceImpl implements IAiSkillService
     @Autowired
     private AiSkillMapper aiSkillMapper;
 
+    @Autowired
+    private AiSkillResourceMapper resourceMapper;
+
+    @Autowired
+    private SkillStorageService storage;
+
     @Override
     public AiSkill selectAiSkillById(Long skillId)
     {
-        return aiSkillMapper.selectAiSkillById(skillId);
+        AiSkill skill = aiSkillMapper.selectAiSkillById(skillId);
+        if (skill != null)
+        {
+            fillFromFile(skill);
+        }
+        return skill;
+    }
+
+    /** 技能包技能：正文从沙箱 SKILL.md 回填，并附带资源清单 */
+    private void fillFromFile(AiSkill skill)
+    {
+        if (storage.exists(skill.getSkillName()))
+        {
+            try
+            {
+                String main = storage.readMain(skill.getSkillName());
+                if (main != null)
+                {
+                    skill.setContent(main);
+                }
+            }
+            catch (Exception ignored)
+            {
+            }
+            skill.setResources(resourceMapper.selectBySkillId(skill.getSkillId()));
+        }
     }
 
     @Override
@@ -51,16 +90,47 @@ public class AiSkillServiceImpl implements IAiSkillService
     @Override
     public int updateAiSkill(AiSkill aiSkill)
     {
-        return aiSkillMapper.updateAiSkill(aiSkill);
+        int rows = aiSkillMapper.updateAiSkill(aiSkill);
+        // 技能包技能在管理页编辑正文时，同步写回沙箱 SKILL.md，保持库与文件一致
+        if (rows > 0 && StringUtils.isNotEmpty(aiSkill.getContent()) && storage.exists(aiSkill.getSkillName()))
+        {
+            try
+            {
+                storage.writeMain(aiSkill.getSkillName(), aiSkill.getContent());
+            }
+            catch (Exception e)
+            {
+                throw new ServiceException("技能正文写回文件失败: " + e.getMessage());
+            }
+        }
+        return rows;
     }
 
     @Override
+    @Transactional
     public int deleteAiSkillByIds(Long[] skillIds)
     {
+        for (Long id : skillIds)
+        {
+            AiSkill skill = aiSkillMapper.selectAiSkillById(id);
+            if (skill == null)
+            {
+                continue;
+            }
+            resourceMapper.deleteBySkillId(id);
+            try
+            {
+                storage.delete(skill.getSkillName());
+            }
+            catch (Exception ignored)
+            {
+            }
+        }
         return aiSkillMapper.deleteAiSkillByIds(skillIds);
     }
 
     @Override
+    @Transactional
     public List<Map<String, Object>> importSkills(MultipartFile file) throws Exception
     {
         if (file == null || file.isEmpty())
@@ -72,15 +142,18 @@ public class AiSkillServiceImpl implements IAiSkillService
         {
             throw new ServiceException("仅支持 .zip 文件");
         }
+        byte[] zipBytes = file.getBytes();
         List<Map<String, Object>> detail = new ArrayList<>();
-        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(file.getBytes()), StandardCharsets.UTF_8))
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes), StandardCharsets.UTF_8))
         {
+            // 阶段一：收集 zip 内全部安全的 .md 条目（分隔符统一为 /，兼容 Windows 反斜杠 zip）
+            Map<String, String> mdEntries = new LinkedHashMap<>();
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null)
             {
-                String name = entry.getName();
+                String name = entry.getName().replace(BS, "/");
                 if (entry.isDirectory() || name.contains("..") || name.startsWith("/")
-                        || name.startsWith(BS) || name.startsWith("__MACOSX") || name.startsWith("."))
+                        || name.startsWith("__MACOSX") || name.startsWith("."))
                 {
                     continue;
                 }
@@ -88,18 +161,55 @@ public class AiSkillServiceImpl implements IAiSkillService
                 {
                     continue;
                 }
-                String content = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                mdEntries.put(name, new String(zis.readAllBytes(), StandardCharsets.UTF_8));
+            }
+
+            // 阶段二：筛选技能文件 ——
+            // 现代技能包是「SKILL.md + references/data 等参考文档」结构，
+            // 只有 SKILL.md 是技能定义，其余文档作为附属资源落盘，不单独成技能；
+            // 整个 zip 只有一个散装 md 时仍按单文件技能兼容导入
+            List<String> selected = new ArrayList<>();
+            boolean hasSkillMd = false;
+            for (String n : mdEntries.keySet())
+            {
+                String base = n.substring(0, n.length() - 3);
+                int slash = lastSep(base);
+                String title = slash >= 0 ? base.substring(slash + 1) : base;
+                if ("SKILL".equalsIgnoreCase(title) && slash > 0)
+                {
+                    hasSkillMd = true;
+                    selected.add(n);
+                }
+            }
+            if (!hasSkillMd)
+            {
+                if (mdEntries.size() == 1)
+                {
+                    selected.addAll(mdEntries.keySet());
+                }
+                else
+                {
+                    throw new ServiceException("zip 中未找到 {技能名}/SKILL.md，且包含 "
+                            + mdEntries.size() + " 个散装 md 无法确定技能；请压缩技能目录（含 SKILL.md）或单个 md 文件");
+                }
+            }
+
+            for (String name : selected)
+            {
+                String content = mdEntries.get(name);
 
                 // 技能名：SKILL.md 取父目录名，否则取文件名
                 String base = name.substring(0, name.length() - 3);
                 int slash = lastSep(base);
                 String fileTitle = slash >= 0 ? base.substring(slash + 1) : base;
                 String skillName;
+                String packagePrefix = null;
                 if ("SKILL".equalsIgnoreCase(fileTitle) && slash > 0)
                 {
                     String parent = base.substring(0, slash);
                     int pslash = lastSep(parent);
                     skillName = pslash >= 0 ? parent.substring(pslash + 1) : parent;
+                    packagePrefix = parent + "/";
                 }
                 else
                 {
@@ -155,37 +265,109 @@ public class AiSkillServiceImpl implements IAiSkillService
                         body = sb.toString();
                     }
                 }
-
-                // upsert（按技能名），导入后默认停用
-                AiSkill q = new AiSkill();
-                q.setSkillName(skillName);
-                List<AiSkill> exists = aiSkillMapper.selectAiSkillList(q);
-                String action;
-                if (exists.isEmpty())
+                // 描述超长截断到列宽 2000
+                if (description.length() > 2000)
                 {
-                    AiSkill s = new AiSkill();
-                    s.setSkillName(skillName);
-                    s.setDescription(description);
-                    s.setContent(body.trim());
-                    s.setEnabled("0");
-                    s.setCreateBy("import");
-                    aiSkillMapper.insertAiSkill(s);
-                    action = "新增";
+                    description = description.substring(0, 2000);
+                }
+
+                // 技能包（SKILL.md）：全量解压落盘沙箱，正文不存库，资源清单入库
+                int resourceCount = 0;
+                if (packagePrefix != null)
+                {
+                    List<Map<String, Object>> files = storage.extract(zipBytes, skillName, packagePrefix);
+                    List<AiSkillResource> resources = new ArrayList<>();
+                    for (Map<String, Object> f : files)
+                    {
+                        String rel = String.valueOf(f.get("relPath"));
+                        if ("SKILL.md".equalsIgnoreCase(rel))
+                        {
+                            continue;
+                        }
+                        AiSkillResource r = new AiSkillResource();
+                        r.setRelPath(rel);
+                        r.setFileSize((Long) f.get("size"));
+                        resources.add(r);
+                    }
+                    resourceCount = resources.size();
+
+                    AiSkill q = new AiSkill();
+                    q.setSkillName(skillName);
+                    List<AiSkill> exists = aiSkillMapper.selectAiSkillList(q);
+                    Long skillId;
+                    String action;
+                    if (exists.isEmpty())
+                    {
+                        AiSkill s = new AiSkill();
+                        s.setSkillName(skillName);
+                        s.setDescription(description);
+                        s.setContent("");
+                        s.setEnabled("0");
+                        s.setCreateBy("import");
+                        aiSkillMapper.insertAiSkill(s);
+                        skillId = s.getSkillId();
+                        action = "新增";
+                    }
+                    else
+                    {
+                        AiSkill s = exists.get(0);
+                        s.setDescription(description);
+                        s.setContent("");
+                        s.setUpdateBy("import");
+                        aiSkillMapper.updateAiSkill(s);
+                        skillId = s.getSkillId();
+                        action = "更新";
+                    }
+                    if (!resources.isEmpty())
+                    {
+                        for (AiSkillResource r : resources)
+                        {
+                            r.setSkillId(skillId);
+                        }
+                        resourceMapper.deleteBySkillId(skillId);
+                        resourceMapper.insertBatch(resources);
+                    }
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("name", skillName);
+                    row.put("action", action);
+                    row.put("description", description);
+                    row.put("resourceCount", resourceCount);
+                    detail.add(row);
                 }
                 else
                 {
-                    AiSkill s = exists.get(0);
-                    s.setDescription(description);
-                    s.setContent(body.trim());
-                    s.setUpdateBy("import");
-                    aiSkillMapper.updateAiSkill(s);
-                    action = "更新";
+                    // 散装单 md：content 存库（无附属资源）
+                    AiSkill q = new AiSkill();
+                    q.setSkillName(skillName);
+                    List<AiSkill> exists = aiSkillMapper.selectAiSkillList(q);
+                    String action;
+                    if (exists.isEmpty())
+                    {
+                        AiSkill s = new AiSkill();
+                        s.setSkillName(skillName);
+                        s.setDescription(description);
+                        s.setContent(body.trim());
+                        s.setEnabled("0");
+                        s.setCreateBy("import");
+                        aiSkillMapper.insertAiSkill(s);
+                        action = "新增";
+                    }
+                    else
+                    {
+                        AiSkill s = exists.get(0);
+                        s.setDescription(description);
+                        s.setContent(body.trim());
+                        s.setUpdateBy("import");
+                        aiSkillMapper.updateAiSkill(s);
+                        action = "更新";
+                    }
+                    Map<String, Object> row = new LinkedHashMap<>();
+                    row.put("name", skillName);
+                    row.put("action", action);
+                    row.put("description", description);
+                    row.put("resourceCount", 0);
+                    detail.add(row);
                 }
-                Map<String, Object> row = new LinkedHashMap<>();
-                row.put("name", skillName);
-                row.put("action", action);
-                row.put("description", description);
-                detail.add(row);
             }
         }
         if (detail.isEmpty())

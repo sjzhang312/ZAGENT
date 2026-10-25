@@ -1,9 +1,9 @@
 package com.zagent.ai.adapter;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
+import com.openai.client.okhttp.OpenAIOkHttpClientAsync;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
@@ -27,9 +27,6 @@ public class OpenAiAdapter extends AbstractProviderAdapter
 
     public static final String DEFAULT_BASE = "https://api.openai.com";
 
-    /** 每个 stream 调用的 OpenAI reasoning 累积值差分状态（按线程） */
-    private final Map<Long, String> lastAccum = new ConcurrentHashMap<>();
-
     @Override
     public String providerCode()
     {
@@ -39,13 +36,23 @@ public class OpenAiAdapter extends AbstractProviderAdapter
     @Override
     protected ChatModel buildChatModel(ChatRequest request, String cacheKey)
     {
-        com.openai.client.OpenAIClient client = OpenAIOkHttpClient.builder()
-                .baseUrl(normalizeBase(request.getBaseUrl()))
+        String base = normalizeBase(request.getBaseUrl());
+        // Spring AI 2.0 流式走 async 客户端、非流式走 sync 客户端，
+        // 仅设置 openAiClient 时 stream() 会在内部重建 async 客户端并因缺少凭证失败，
+        // 因此两个客户端都要显式构建传入
+        com.openai.client.OpenAIClient sync = OpenAIOkHttpClient.builder()
+                .baseUrl(base)
+                .apiKey(request.getApiKey())
+                .timeout(Duration.ofSeconds(120))
+                .build();
+        com.openai.client.OpenAIClientAsync async = OpenAIOkHttpClientAsync.builder()
+                .baseUrl(base)
                 .apiKey(request.getApiKey())
                 .timeout(Duration.ofSeconds(120))
                 .build();
         return OpenAiChatModel.builder()
-                .openAiClient(client)
+                .openAiClient(sync)
+                .openAiClientAsync(async)
                 .build();
     }
 
@@ -73,7 +80,7 @@ public class OpenAiAdapter extends AbstractProviderAdapter
     }
 
     @Override
-    protected String extractThinking(ChatResponse chunk)
+    protected String extractThinking(ChatResponse chunk, AtomicReference<String> state)
     {
         if (chunk.getResults() == null || chunk.getResults().isEmpty())
         {
@@ -95,16 +102,20 @@ public class OpenAiAdapter extends AbstractProviderAdapter
             return null;
         }
         String accum = rc.toString();
-        long threadId = Thread.currentThread().getId();
-        String last = lastAccum.getOrDefault(threadId, "");
+        String last = state.get();
+        if (accum.equals(last))
+        {
+            // 累积值未变化：思考已结束后正文 chunk 仍携带同一快照，跳过避免整段重发
+            return null;
+        }
         if (accum.length() <= last.length() || !accum.startsWith(last))
         {
             // 服务端未按累积下发（已是增量）或发生重置
-            lastAccum.put(threadId, accum);
+            state.set(accum);
             return accum;
         }
         String delta = accum.substring(last.length());
-        lastAccum.put(threadId, accum);
+        state.set(accum);
         return delta;
     }
 

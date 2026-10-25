@@ -68,7 +68,7 @@ public class AgentToolCallbacks
         }
         if (enabled.contains(BASH))
         {
-            callbacks.add(tool(BASH, "在沙箱目录下执行 shell 命令（Windows 为 cmd），返回退出码与输出",
+            callbacks.add(tool(BASH, "在沙箱目录下执行 shell 命令并返回退出码与输出。注意：Windows 下为 cmd.exe 语法——多命令用 & 分隔（不要用 ; ）、删除文件用 del、变量用 %var%、路径分隔用 \\",
                     "{\"type\":\"object\",\"properties\":{\"command\":{\"type\":\"string\",\"description\":\"要执行的命令\"}},\"required\":[\"command\"]}",
                     args -> executor.bash(args.getString("command"))));
         }

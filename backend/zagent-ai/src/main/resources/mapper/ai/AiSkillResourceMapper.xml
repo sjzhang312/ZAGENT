@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zagent.ai.mapper.AiSkillResourceMapper">
+
+    <resultMap type="AiSkillResource" id="AiSkillResourceResult">
+        <result property="resourceId" column="resource_id" />
+        <result property="skillId" column="skill_id" />
+        <result property="relPath" column="rel_path" />
+        <result property="fileSize" column="file_size" />
+    </resultMap>
+
+    <select id="selectBySkillId" parameterType="Long" resultMap="AiSkillResourceResult">
+        select resource_id, skill_id, rel_path, file_size
+          from ai_skill_resource
+         where skill_id = #{skillId}
+         order by rel_path
+    </select>
+
+    <insert id="insertBatch">
+        insert into ai_skill_resource (skill_id, rel_path, file_size) values
+        <foreach collection="list" item="r" separator=",">
+            (#{r.skillId}, #{r.relPath}, #{r.fileSize})
+        </foreach>
+    </insert>
+
+    <delete id="deleteBySkillId" parameterType="Long">
+        delete from ai_skill_resource where skill_id = #{skillId}
+    </delete>
+</mapper>

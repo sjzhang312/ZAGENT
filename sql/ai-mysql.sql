@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS ai_model (
 CREATE TABLE IF NOT EXISTS ai_agent (
   agent_id          bigint       not null auto_increment,
   agent_name        varchar(50)  not null,
-  description       varchar(255)     default '',
+  description       varchar(2000)    default '',
   model_id          bigint       not null,
   thinking_level    int              default 0,
   temperature       decimal(3,2)     default 0.7,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS ai_agent (
 CREATE TABLE IF NOT EXISTS ai_skill (
   skill_id          bigint       not null auto_increment,
   skill_name        varchar(50)  not null,
-  description       varchar(255)     default '',
+  description       varchar(2000)    default '',
   content           text,
   enabled           char(1)          default '0',
   create_by         varchar(64)      default '',
@@ -69,6 +69,17 @@ CREATE TABLE IF NOT EXISTS ai_skill (
   remark            varchar(500)     default null,
   primary key (skill_id)
 );
+
+-- 技能附属资源（现代技能包：SKILL.md 之外的 references/scripts/data 等，落盘于沙箱 skills/{技能名}/）
+CREATE TABLE IF NOT EXISTS ai_skill_resource (
+  resource_id       bigint       not null auto_increment,
+  skill_id          bigint       not null,
+  rel_path          varchar(500)     not null,
+  file_size         bigint           default 0,
+  create_time       datetime,
+  primary key (resource_id),
+  key idx_skill_resource (skill_id)
+) engine=innodb auto_increment=100;
 
 -- 问答会话
 CREATE TABLE IF NOT EXISTS ai_chat_session (

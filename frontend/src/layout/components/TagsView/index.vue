@@ -70,7 +70,7 @@
 
 <script setup lang="ts">
 import ScrollPane from './ScrollPane.vue'
-import { getNormalPath } from '@/utils/ruoyi'
+import { getNormalPath } from '@/utils/zagent'
 import useTagsViewStore from '@/store/modules/tagsView'
 import useSettingsStore from '@/store/modules/settings'
 import usePermissionStore from '@/store/modules/permission'

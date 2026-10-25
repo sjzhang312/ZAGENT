@@ -1,5 +1,6 @@
 package com.zagent.ai.domain;
 
+import java.util.List;
 import com.zagent.common.core.domain.BaseEntity;
 
 /**
@@ -20,11 +21,14 @@ public class AiSkill extends BaseEntity
     /** 技能描述 */
     private String description;
 
-    /** 技能内容 markdown */
+    /** 技能内容 markdown（技能包技能正文落盘沙箱，此字段为空） */
     private String content;
 
     /** 是否启用 0停用 1启用 */
     private String enabled;
+
+    /** 附属资源清单（详情接口回填，非数据库字段） */
+    private transient List<AiSkillResource> resources;
 
     public Long getSkillId()
     {
@@ -74,6 +78,16 @@ public class AiSkill extends BaseEntity
     public void setEnabled(String enabled)
     {
         this.enabled = enabled;
+    }
+
+    public List<AiSkillResource> getResources()
+    {
+        return resources;
+    }
+
+    public void setResources(List<AiSkillResource> resources)
+    {
+        this.resources = resources;
     }
 
 }

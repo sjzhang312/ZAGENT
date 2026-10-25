@@ -3,6 +3,7 @@ package com.zagent.ai.adapter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.Map;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -41,8 +42,12 @@ public abstract class AbstractProviderAdapter implements ProviderAdapter
     /** 构建本次请求的模型参数 */
     protected abstract ChatOptions buildOptions(ChatRequest request);
 
-    /** 从流式 chunk 中提取思考增量（无则返回 null） */
-    protected abstract String extractThinking(ChatResponse chunk);
+    /**
+     * 从流式 chunk 中提取思考增量（无则返回 null）。
+     * state 为本次流调用的共享状态（串行回调，线程安全），
+     * 供需要做累积差分的协议（OpenAI 系 reasoning_content）保存上次累积值。
+     */
+    protected abstract String extractThinking(ChatResponse chunk, AtomicReference<String> state);
 
     @Override
     public Flux<UnifiedEvent> stream(ChatRequest request)
@@ -64,6 +69,7 @@ public abstract class AbstractProviderAdapter implements ProviderAdapter
         ChatModel chatModel = modelCache.computeIfAbsent(cacheKey, k -> buildChatModel(request, k));
         Prompt prompt = new Prompt(messages, buildOptions(request));
         List<ToolCallback> wrapped = wrapToolCallbacks(request.getToolCallbacks(), out);
+        AtomicReference<String> thinkingState = new AtomicReference<>("");
 
         ChatClient.create(chatModel)
                 .prompt(prompt)
@@ -72,18 +78,18 @@ public abstract class AbstractProviderAdapter implements ProviderAdapter
                 .chatResponse()
                 .subscribeOn(Schedulers.boundedElastic())
                 .subscribe(
-                    chunk -> handleChunk(chunk, out),
+                    chunk -> handleChunk(chunk, out, thinkingState),
                     err -> out.tryEmitError(err),
                     () -> out.tryEmitComplete());
 
         return out.asFlux();
     }
 
-    private void handleChunk(ChatResponse chunk, Sinks.Many<UnifiedEvent> out)
+    private void handleChunk(ChatResponse chunk, Sinks.Many<UnifiedEvent> out, AtomicReference<String> thinkingState)
     {
         try
         {
-            String thinking = extractThinking(chunk);
+            String thinking = extractThinking(chunk, thinkingState);
             if (thinking != null && !thinking.isEmpty())
             {
                 out.tryEmitNext(UnifiedEvent.thinking(thinking));

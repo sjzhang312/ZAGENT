@@ -150,7 +150,6 @@ CREATE TABLE IF NOT EXISTS sys_menu (
 -- ----------------------------
 -- 一级菜单
 MERGE INTO sys_menu KEY(menu_id) VALUES('1', '系统管理', '0', '1', 'system',           null, '', '', 1, 0, 'M', '0', '0', '', 'system',   'admin', CURRENT_TIMESTAMP, '', null, '系统管理目录');
-MERGE INTO sys_menu KEY(menu_id) VALUES('2', '系统监控', '0', '2', 'monitor',          null, '', '', 1, 0, 'M', '0', '0', '', 'monitor',  'admin', CURRENT_TIMESTAMP, '', null, '系统监控目录');
 MERGE INTO sys_menu KEY(menu_id) VALUES('3', '系统工具', '0', '3', 'tool',             null, '', '', 1, 0, 'M', '0', '0', '', 'tool',     'admin', CURRENT_TIMESTAMP, '', null, '系统工具目录');
 -- 二级菜单
 MERGE INTO sys_menu KEY(menu_id) VALUES('100',  '用户管理', '1',   '1', 'user',       'system/user/index',        '', '', 1, 0, 'C', '0', '0', 'system:user:list',        'user',          'admin', CURRENT_TIMESTAMP, '', null, '用户管理菜单');
@@ -161,8 +160,6 @@ MERGE INTO sys_menu KEY(menu_id) VALUES('104',  '岗位管理', '1',   '5', 'pos
 MERGE INTO sys_menu KEY(menu_id) VALUES('105',  '字典管理', '1',   '6', 'dict',       'system/dict/index',        '', '', 1, 0, 'C', '0', '0', 'system:dict:list',        'dict',          'admin', CURRENT_TIMESTAMP, '', null, '字典管理菜单');
 MERGE INTO sys_menu KEY(menu_id) VALUES('106',  '参数设置', '1',   '7', 'config',     'system/config/index',      '', '', 1, 0, 'C', '0', '0', 'system:config:list',      'edit',          'admin', CURRENT_TIMESTAMP, '', null, '参数设置菜单');
 MERGE INTO sys_menu KEY(menu_id) VALUES('108',  '日志管理', '1',   '9', 'log',        '',                         '', '', 1, 0, 'M', '0', '0', '',                        'log',           'admin', CURRENT_TIMESTAMP, '', null, '日志管理菜单');
-MERGE INTO sys_menu KEY(menu_id) VALUES('109',  '在线用户', '2',   '1', 'online',     'monitor/online/index',     '', '', 1, 0, 'C', '0', '0', 'monitor:online:list',     'online',        'admin', CURRENT_TIMESTAMP, '', null, '在线用户菜单');
-MERGE INTO sys_menu KEY(menu_id) VALUES('111',  '数据监控', '2',   '3', 'druid',      'monitor/druid/index',      '', '', 1, 0, 'C', '0', '0', 'monitor:druid:list',      'druid',         'admin', CURRENT_TIMESTAMP, '', null, '数据监控菜单');
 MERGE INTO sys_menu KEY(menu_id) VALUES('117',  '系统接口', '3',   '3', 'swagger',    'tool/swagger/index',       '', '', 1, 0, 'C', '0', '0', 'tool:swagger:list',       'swagger',       'admin', CURRENT_TIMESTAMP, '', null, '系统接口菜单');
 -- 三级菜单
 MERGE INTO sys_menu KEY(menu_id) VALUES('500',  '操作日志', '108', '1', 'operlog',    'monitor/operlog/index',    '', '', 1, 0, 'C', '0', '0', 'monitor:operlog:list',    'form',          'admin', CURRENT_TIMESTAMP, '', null, '操作日志菜单');
@@ -254,7 +251,6 @@ CREATE TABLE IF NOT EXISTS sys_role_menu (
 -- 初始化-角色和菜单关联表数据
 -- ----------------------------
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '1');
-MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '2');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '3');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '100');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '101');
@@ -264,8 +260,6 @@ MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '104');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '105');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '106');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '108');
-MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '109');
-MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '111');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '117');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '500');
 MERGE INTO sys_role_menu KEY(role_id, menu_id) VALUES ('2', '501');
@@ -556,7 +550,7 @@ CREATE TABLE IF NOT EXISTS ai_model (
 CREATE TABLE IF NOT EXISTS ai_agent (
   agent_id          bigint       not null auto_increment,
   agent_name        varchar(50)  not null,
-  description       varchar(255)     default '',
+  description       varchar(2000)    default '',
   model_id          bigint       not null,
   thinking_level    int              default 0,
   temperature       decimal(3,2)     default 0.7,
@@ -576,7 +570,7 @@ CREATE TABLE IF NOT EXISTS ai_agent (
 CREATE TABLE IF NOT EXISTS ai_skill (
   skill_id          bigint       not null auto_increment,
   skill_name        varchar(50)  not null,
-  description       varchar(255)     default '',
+  description       varchar(2000)    default '',
   content           text,
   enabled           char(1)          default '0',
   create_by         varchar(64)      default '',
@@ -586,6 +580,17 @@ CREATE TABLE IF NOT EXISTS ai_skill (
   remark            varchar(500)     default null,
   primary key (skill_id)
 );
+
+-- 技能附属资源（现代技能包：SKILL.md 之外的 references/scripts/data 等，落盘于沙箱 skills/{技能名}/）
+CREATE TABLE IF NOT EXISTS ai_skill_resource (
+  resource_id       bigint       not null auto_increment,
+  skill_id          bigint       not null,
+  rel_path          varchar(500)     not null,
+  file_size         bigint           default 0,
+  create_time       datetime,
+  primary key (resource_id)
+);
+CREATE INDEX IF NOT EXISTS idx_skill_resource ON ai_skill_resource (skill_id);
 
 -- 问答会话
 CREATE TABLE IF NOT EXISTS ai_chat_session (

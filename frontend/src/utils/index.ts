@@ -1,4 +1,4 @@
-import { parseTime } from './ruoyi'
+import { parseTime } from './zagent'
 
 /**
  * 表格时间格式化

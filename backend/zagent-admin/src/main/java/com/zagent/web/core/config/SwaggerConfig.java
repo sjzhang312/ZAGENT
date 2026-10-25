@@ -55,7 +55,7 @@ public class SwaggerConfig
             // 设置标题
             .title("标题：ZAGENT 智能体管理系统_接口文档")
             // 描述
-            .description("描述：用于管理集团旗下公司的人员信息,具体包括XXX,XXX模块...")
+            .description("ZAGENT 智能体管理系统接口文档：模型服务商/模型配置、智能体、技能、问答与会话留痕等")
             // 作者信息
             .contact(new Contact().name(zagentConfig.getName()))
             // 版本

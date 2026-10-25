@@ -1,6 +1,6 @@
 /**
 * v-copyText 复制文本内容
-* Copyright (c) 2022 ruoyi
+* Copyright (c) 2026 zagent
 */
 export default {
   beforeMount(el: HTMLElement, { value, arg }: DirectiveBinding) {

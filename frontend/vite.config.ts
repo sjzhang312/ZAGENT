@@ -52,8 +52,9 @@ export default defineConfig(({ mode, command }) => {
           changeOrigin: true,
           rewrite: (p) => p.replace(/^\/dev-api/, '')
         },
-         // springdoc proxy
-         '^/v3/api-docs/(.*)': {
+        // springdoc 代理（不能只匹配 /v3/api-docs/(.*)：swagger-ui 拉取规范
+        // 本身请求的是不带尾部路径的 /v3/api-docs，漏掉会命中 SPA 回退返回 HTML）
+        '^/v3/api-docs': {
           target: baseUrl,
           changeOrigin: true,
         }

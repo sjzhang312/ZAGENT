@@ -104,15 +104,30 @@ public class AgentToolExecutor
         pb.directory(root.toFile());
         pb.redirectErrorStream(true);
         Process process = pb.start();
-        String output;
+        // 关闭 stdin，防止子进程等待交互输入
+        process.getOutputStream().close();
+        // 并发消费输出：若先 waitFor 再读，输出超过管道缓冲区（~4KB）时
+        // 子进程会阻塞在写管道上永不退出，表现为 60s 超时
+        java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
+        Thread reader = new Thread(() -> {
+            try (java.io.InputStream in = process.getInputStream())
+            {
+                in.transferTo(buf);
+            }
+            catch (IOException ignored)
+            {
+            }
+        });
+        reader.setDaemon(true);
+        reader.start();
         boolean finished = process.waitFor(bashTimeoutSeconds, TimeUnit.SECONDS);
         if (!finished)
         {
             process.destroyForcibly();
             throw new ServiceException("命令执行超时（>" + bashTimeoutSeconds + "s）: " + command);
         }
-        byte[] bytes = process.getInputStream().readAllBytes();
-        output = new String(bytes, StandardCharsets.UTF_8);
+        reader.join(3000);
+        String output = buf.toString(StandardCharsets.UTF_8);
         if (output.length() > OUTPUT_LIMIT)
         {
             output = output.substring(0, OUTPUT_LIMIT) + "\n...(输出截断)";

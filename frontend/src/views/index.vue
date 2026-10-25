@@ -4,7 +4,7 @@
       <div class="logo">ZAGENT</div>
       <div class="sub">智能体管理系统</div>
       <div class="desc">
-        基于 RuoYi 骨干 + Spring AI 构建的智能体平台：双厂商模型接入（Anthropic / OpenAI）、
+        基于 Spring AI 构建的智能体平台：双厂商模型接入（Anthropic / OpenAI）、
         智能体配置、技能库（/ 调用）、四工具沙箱（read / write / edit / bash）、流式问答与思考轨迹回放。
       </div>
       <div class="entry">

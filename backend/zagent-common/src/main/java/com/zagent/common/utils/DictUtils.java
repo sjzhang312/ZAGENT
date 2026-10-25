@@ -41,10 +41,18 @@ public class DictUtils
      */
     public static List<SysDictData> getDictCache(String key)
     {
-        JSONArray arrayCache = SpringUtils.getBean(RedisCache.class).getCacheObject(getCacheKey(key));
-        if (StringUtils.isNotNull(arrayCache))
+        Object cacheObj = SpringUtils.getBean(RedisCache.class).getCacheObject(getCacheKey(key));
+        if (cacheObj instanceof JSONArray)
         {
-            return arrayCache.toList(SysDictData.class);
+            // redis 缓存经 JSON 反序列化得到 JSONArray
+            return ((JSONArray) cacheObj).toList(SysDictData.class);
+        }
+        if (cacheObj instanceof List)
+        {
+            // 内存缓存原样存取，直接就是 List<SysDictData>
+            @SuppressWarnings("unchecked")
+            List<SysDictData> listCache = (List<SysDictData>) cacheObj;
+            return listCache;
         }
         return null;
     }

@@ -1,5 +1,5 @@
 import request from '@/utils/request'
-import { parseStrEmpty } from "@/utils/ruoyi"
+import { parseStrEmpty } from "@/utils/zagent"
 import type { UserQueryParams, UserFormDataResult, UserProfileResult, UserAuthRoleResult, UserProfileAvatarResult, SysUser, SysUserRole, SysUserRoles, AjaxResult, TableDataInfo, TreeSelect } from '@/types'
 
 // 查询用户列表

@@ -1,6 +1,14 @@
 import request from '@/utils/request'
 import type { AjaxResult, TableDataInfo } from '@/types'
 
+/** AI 技能附属资源（技能包文件，落盘于沙箱 skills/{技能名}/） */
+export interface SkillResource {
+  resourceId?: number
+  skillId?: number
+  relPath?: string
+  fileSize?: number
+}
+
 /** AI 技能 */
 export interface AiSkill {
   skillId?: number
@@ -11,6 +19,8 @@ export interface AiSkill {
   createBy?: string
   createTime?: string
   remark?: string
+  /** 技能包附属资源（详情接口回填） */
+  resources?: SkillResource[]
 }
 
 /** zip 导入明细行 */
@@ -18,6 +28,7 @@ export interface SkillImportRow {
   name: string
   action: string
   description: string
+  resourceCount?: number
 }
 
 // 查询技能列表

@@ -1,11 +1,14 @@
 package com.zagent.ai.service.impl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,6 +33,7 @@ import com.zagent.ai.domain.AiChatTrace;
 import com.zagent.ai.domain.AiModel;
 import com.zagent.ai.domain.AiProvider;
 import com.zagent.ai.domain.AiSkill;
+import com.zagent.ai.domain.AiSkillResource;
 import com.zagent.ai.domain.vo.ChatSendBody;
 import com.zagent.ai.mapper.AiAgentMapper;
 import com.zagent.ai.mapper.AiChatMessageMapper;
@@ -38,8 +42,10 @@ import com.zagent.ai.mapper.AiChatTraceMapper;
 import com.zagent.ai.mapper.AiModelMapper;
 import com.zagent.ai.mapper.AiProviderMapper;
 import com.zagent.ai.mapper.AiSkillMapper;
+import com.zagent.ai.mapper.AiSkillResourceMapper;
 import com.zagent.ai.service.IAiChatService;
 import com.zagent.ai.tools.AgentToolCallbacks;
+import com.zagent.ai.tools.SkillStorageService;
 import com.zagent.common.exception.ServiceException;
 import com.zagent.common.utils.StringUtils;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -72,6 +78,12 @@ public class AiChatServiceImpl implements IAiChatService
 
     @Autowired
     private AiSkillMapper skillMapper;
+
+    @Autowired
+    private AiSkillResourceMapper skillResourceMapper;
+
+    @Autowired
+    private SkillStorageService skillStorage;
 
     @Autowired
     private AiChatSessionMapper sessionMapper;
@@ -145,9 +157,16 @@ public class AiChatServiceImpl implements IAiChatService
                     continue;
                 }
                 AiSkill skill = hits.get(0);
-                skillPrompt.append("<skill name=\"").append(skill.getSkillName()).append("\">\n")
-                        .append("描述: ").append(StringUtils.nvl(skill.getDescription(), "")).append("\n\n")
-                        .append(StringUtils.nvl(skill.getContent(), "")).append("\n</skill>\n\n");
+                if (skillStorage.exists(skill.getSkillName()))
+                {
+                    appendPackageSkill(skillPrompt, skill, agent);
+                }
+                else
+                {
+                    skillPrompt.append("<skill name=\"").append(skill.getSkillName()).append("\">\n")
+                            .append("描述: ").append(StringUtils.nvl(skill.getDescription(), "")).append("\n\n")
+                            .append(StringUtils.nvl(skill.getContent(), "")).append("\n</skill>\n\n");
+                }
             }
         }
         if (content.isEmpty())
@@ -361,6 +380,72 @@ public class AiChatServiceImpl implements IAiChatService
         catch (Exception ignored)
         {
         }
+    }
+
+    /**
+     * 技能包注入：正文 + 资源清单 + 四工具使用指引（read/write/edit/bash，按智能体启用的工具过滤）。
+     * 技能文件已落盘在沙箱 skills/{技能名}/，模型可直接用工具访问与执行，
+     * 工具调用过程会以工具状态帧（read/bash/write/edit）展示给前端。
+     */
+    private void appendPackageSkill(StringBuilder skillPrompt, AiSkill skill, AiAgent agent)
+    {
+        String name = skill.getSkillName();
+        String main = null;
+        try
+        {
+            main = skillStorage.readMain(name);
+        }
+        catch (Exception ignored)
+        {
+        }
+        skillPrompt.append("<skill name=\"").append(name).append("\">\n")
+                .append("描述: ").append(StringUtils.nvl(skill.getDescription(), "")).append("\n\n")
+                .append(main == null ? StringUtils.nvl(skill.getContent(), "") : main).append("\n\n");
+
+        List<AiSkillResource> resources = skillResourceMapper.selectBySkillId(skill.getSkillId());
+        if (!resources.isEmpty())
+        {
+            skillPrompt.append("# 技能附属资源（已放在沙箱 skills/").append(name).append("/ 目录）\n");
+            int limit = Math.min(resources.size(), 30);
+            for (int i = 0; i < limit; i++)
+            {
+                skillPrompt.append("- skills/").append(name).append("/").append(resources.get(i).getRelPath()).append('\n');
+            }
+            if (resources.size() > limit)
+            {
+                skillPrompt.append("- ...共 ").append(resources.size()).append(" 个文件\n");
+            }
+            skillPrompt.append('\n');
+        }
+
+        Set<String> tools = new HashSet<>();
+        if (StringUtils.isNotEmpty(agent.getEnabledTools()))
+        {
+            tools.addAll(Arrays.asList(agent.getEnabledTools().split(",")));
+        }
+        StringBuilder guide = new StringBuilder();
+        if (tools.contains(AgentToolCallbacks.READ))
+        {
+            guide.append("- read：查看技能参考文档/脚本内容，如 read skills/").append(name).append("/references/xxx.md\n");
+        }
+        if (tools.contains(AgentToolCallbacks.BASH))
+        {
+            guide.append("- bash：执行技能脚本，如 bash python skills/").append(name).append("/scripts/xxx.py 参数\n");
+        }
+        if (tools.contains(AgentToolCallbacks.WRITE))
+        {
+            guide.append("- write：把生成产物写入工作目录文件（如 output.drawio）\n");
+        }
+        if (tools.contains(AgentToolCallbacks.EDIT))
+        {
+            guide.append("- edit：基于技能模板或产物文件做精确文本修改\n");
+        }
+        if (guide.length() > 0)
+        {
+            skillPrompt.append("# 工具使用（技能文件就在你的沙箱工作目录中）\n").append(guide)
+                    .append("需要技能细节或脚本能力时，主动调用上述工具完成任务，不要凭空猜测。\n");
+        }
+        skillPrompt.append("</skill>\n\n");
     }
 
     private String buildSystemPrompt(AiAgent agent, String skillPrompt)

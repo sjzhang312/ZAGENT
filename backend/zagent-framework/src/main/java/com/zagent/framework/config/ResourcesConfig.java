@@ -1,10 +1,7 @@
 package com.zagent.framework.config;
 
-import java.util.concurrent.TimeUnit;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Autowired;import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.CacheControl;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -32,11 +29,6 @@ public class ResourcesConfig implements WebMvcConfigurer
         /** 本地文件上传路径 */
         registry.addResourceHandler(Constants.RESOURCE_PREFIX + "/**")
                 .addResourceLocations("file:" + ZAgentConfig.getProfile() + "/");
-
-        /** swagger配置 */
-        registry.addResourceHandler("/swagger-ui/**")
-                .addResourceLocations("classpath:/META-INF/resources/webjars/springfox-swagger-ui/")
-                .setCacheControl(CacheControl.maxAge(5, TimeUnit.HOURS).cachePublic());
     }
 
     /**
